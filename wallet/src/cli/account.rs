@@ -187,8 +187,42 @@ impl WalletSubcommand for AccountSubcommand {
                         .ok_or(anyhow::anyhow!("Private account not found in storage"))?,
                 };
 
+                // Helper closure to display keys for the account
+                let display_keys = |wallet_core: &WalletCore| -> Result<()> {
+                    match addr_kind {
+                        AccountPrivacyKind::Public => {
+                            let private_key = wallet_core
+                                .storage
+                                .user_data
+                                .get_pub_account_signing_key(&account_id)
+                                .ok_or(anyhow::anyhow!("Public account not found in storage"))?;
+
+                            let public_key = PublicKey::new_from_private_key(private_key);
+                            println!("pk {}", hex::encode(public_key.value()));
+                        }
+                        AccountPrivacyKind::Private => {
+                            let (key, _) = wallet_core
+                                .storage
+                                .user_data
+                                .get_private_account(&account_id)
+                                .ok_or(anyhow::anyhow!("Private account not found in storage"))?;
+
+                            println!("npk {}", hex::encode(key.nullifer_public_key.0));
+                            println!(
+                                "ipk {}",
+                                hex::encode(key.incoming_viewing_public_key.to_bytes())
+                            );
+                        }
+                    }
+                    Ok(())
+                };
+
                 if account == Account::default() {
                     println!("Account is Uninitialized");
+
+                    if keys {
+                        display_keys(wallet_core)?;
+                    }
 
                     return Ok(SubcommandReturnValue::Empty);
                 }
@@ -239,31 +273,7 @@ impl WalletSubcommand for AccountSubcommand {
                 println!("{}", acc_view);
 
                 if keys {
-                    match addr_kind {
-                        AccountPrivacyKind::Public => {
-                            let private_key = wallet_core
-                                .storage
-                                .user_data
-                                .get_pub_account_signing_key(&account_id)
-                                .ok_or(anyhow::anyhow!("Public account not found in storage"))?;
-
-                            let public_key = PublicKey::new_from_private_key(private_key);
-                            println!("pk {}", hex::encode(public_key.value()));
-                        }
-                        AccountPrivacyKind::Private => {
-                            let (key, _) = wallet_core
-                                .storage
-                                .user_data
-                                .get_private_account(&account_id)
-                                .ok_or(anyhow::anyhow!("Private account not found in storage"))?;
-
-                            println!("npk {}", hex::encode(key.nullifer_public_key.0));
-                            println!(
-                                "ipk {}",
-                                hex::encode(key.incoming_viewing_public_key.to_bytes())
-                            );
-                        }
-                    }
+                    display_keys(wallet_core)?;
                 }
 
                 Ok(SubcommandReturnValue::Empty)
